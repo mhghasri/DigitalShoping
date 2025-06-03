@@ -1,4 +1,4 @@
 test.*
 .env
 .vscode
-__pycatch__
+__pycache__

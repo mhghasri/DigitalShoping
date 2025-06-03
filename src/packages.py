@@ -1,13 +1,17 @@
 from dotenv import load_dotenv
 from colorama import Fore
 import os
+from datetime import datetime
 import pymysql
 
 
 # ---------------------------- #
 
-load_dotenv()       # import file from .env
+current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
+# ---------------------------- #
+
+load_dotenv()       # import file from .env
 
 # read variable
 DB_HOST = os.getenv("DB_HOST")
