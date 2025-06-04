@@ -135,8 +135,15 @@ class ConnectToDB:
 
 # ------------------------------------------------------ #
 
-class Orders:
-    pass
+class ShipingCart:
+    
+    def __init__(self):
+        pass
+# ------------------------ #
+
+    def 
+
+# ------------------------ #
 
 # ------------------------------------------------------ #
 
@@ -508,6 +515,111 @@ class User:
 
 # ------------------------ #
 
+    def buy_product(self):
+
+        print_color("Here you are these are all product:", "c")
+
+        product_data = Product.show_all_product()
+
+        while True:
+
+            try: 
+
+                product_id = input("\nPlease enter product id you want to buy: ")
+
+                product_obj = Product(int(product_id))
+
+                category_obj = Category(product_obj.category_id)
+
+            except (ValueError, TypeError):
+                
+                print_color("Invalid input. Please enter currect input.")
+
+            else:
+                
+                print_color("-" * 40, "b")
+
+                break
+        
+        if not category_obj.category_parent:
+                print_color(f"category: {category_obj.category_name}.", "m")
+
+        else:
+            parent = Category(category_obj.category_parent)
+
+            print_color(f"category: {category_obj.category_name} ---> {parent.category_name}", "m")
+
+        print_color(f"product Id: {product_obj.product_id} --- brand: {product_obj.brand} --- model: {product_obj.model} --- quantity: {product_obj.quantity} --- price: '{product_obj.sell_price}'$.", "c")
+
+        while True:
+
+            yes_or_no = input("\nAre your sure to buy it? (yes, no): ")
+
+            if yes_or_no in ("yes", "no"):
+
+                break
+
+            else:
+                print_color("Just yes/no accepted. Please try again.")
+
+        if yes_or_no == "no":
+            print_color("Tranaction successfully canceled.", "g")
+            return None
+        
+
+        while True:
+
+            try:
+                quantity = int(input("\nPlease enter quantity you want: "))
+
+            except:
+                print_color("Please enter valid number. try again.")
+
+            else:
+                
+                if product_obj.quantity < quantity:
+
+                    print_color("not enough quantity. Please try again.")
+
+                else:
+
+                    break
+
+        amount = quantity * product_obj.sell_price
+
+        if amount > self.balance:
+
+            print_color(f"Not enough money. current balance: '{self.balance}'$. amount: {amount}.")
+
+            quantity = self.balance // product_obj.sell_price
+
+            print_color(f"But you can buy {quantity} of this product.", "g")
+
+            while True:
+                yes_or_no = input("\nAre your sure to buy it? (yes, no): ")
+
+                if yes_or_no in ("yes", "no"):
+
+                    break
+
+                else:
+                    print_color("Just yes/no accepted. Please try again.")
+
+            if yes_or_no == "no":
+                print_color("Tranaction successfully canceled.", "g")
+
+                return None
+
+            else:
+                amount = quantity * product_obj.sell_price
+
+        self.update_balance(amount)
+
+
+
+
+# ------------------------ #
+
     @classmethod
     def login(cls):
         username_list = User.all_username_list()
@@ -693,7 +805,7 @@ class Admin(User):
 
 # print(User.all_username_list())
 
-# ali = User("alinorouzi")
+ali = User("alinorouzi")
 
 # ali.current_balance()
 
@@ -701,4 +813,6 @@ class Admin(User):
 
 # Category.show_all_category()
 
-Product.show_all_product()
+# Product.show_all_product()
+
+ali.buy_product()
