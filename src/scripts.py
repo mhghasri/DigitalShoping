@@ -209,8 +209,12 @@ class Product:
 
     @staticmethod
     def add_new_product():
+
+        print_color("These are all categorys.", "y")
         
         category = Category.show_all_category()
+
+        admin = Admin("mhghasri")
 
         while True:
 
@@ -249,7 +253,7 @@ class Product:
                         else:
                             print_color("yes or no is accepted.")
                             
-                        break
+                    break
 
                 else:
 
@@ -265,7 +269,57 @@ class Product:
         model = input("\nEnter model of new product: ")
 
         while True:
-            pass
+            quantity = input("\nEnter quantity of product: ")
+            buy_price = input("\nEnter buying price of product: ")
+
+            try:
+                quantity = int(quantity)
+                buy_price = float(buy_price)
+
+            except ValueError:
+                print_color("invalid input for quanty or buying price. Please enter valid number.")
+
+            else:
+                break
+
+        sell_price = 1.3 * buy_price
+
+        amount = quantity * buy_price
+
+        if amount > admin.balance:
+
+            print_color(f"You dont have enough balance. current balance: '{admin.balance}'$. product amount: '{amount}'$.")
+
+            quantity = admin.balance // buy_price
+
+            print_color(f"buy you cant buy: {quantity}.", "y")
+
+            while True:
+
+                yes_or_no = input("\nDo you want this? (yes, no): ")
+
+                if yes_or_no in ("yes", "y"):
+
+                    amount = quantity * buy_price
+                    break
+
+                elif yes_or_no in ("no", "n"):
+                    print_color("Transaction cancelled.")
+                    return None
+                            
+                else:
+                    print_color("Just yes or no is accepted.")
+
+        admin.update_balance(amount, "admin_buy")
+
+        query = "insert into products (categoryID, brand, model, quantity, buyprice, sellprice) values (%s, %s, %s, %s, %s, %s)"
+
+        params = (category_id, brand, model, quantity, buy_price, sell_price)
+
+        ConnectToDB(query, *params).insert()
+
+        print_color("New product successfully aded to product.", "g")
+        
 
 # ------------------------ #
 
@@ -446,9 +500,11 @@ class User:
 
             admin_params = (admin.balance, admin.username)
 
-            ConnectToDB(admin_query, *admin_params).update()       
+            ConnectToDB(admin_query, *admin_params).update()
 
-        print_color(f"Your transaction is successfully compelete. Your current balance: '{self.balance}'$.", "g")  
+        print_color(f"Your transaction is successfully compelete.", "g")  
+
+        balance = self.current_balance()       
 
 # ------------------------ #
 
@@ -645,4 +701,4 @@ class Admin(User):
 
 # Category.show_all_category()
 
-Product.add_new_product()
+Product.show_all_product()
