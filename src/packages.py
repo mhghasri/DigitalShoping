@@ -3,7 +3,8 @@ from colorama import Fore
 import os
 from datetime import datetime
 import pymysql
-
+import arabic_reshaper
+from bidi.algorithm import get_display
 
 # ---------------------------- #
 
@@ -46,5 +47,12 @@ def print_color(string: str, mode: str="r"):
 
     else:
         print(f"\n{string}\n")
+
+# ---------------------------- #
+
+def convert(text):
+    reshaped_text = arabic_reshaper.reshape(text)
+    conveted = get_display(reshaped_text)
+    return conveted
 
 # ---------------------------- #

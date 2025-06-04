@@ -168,8 +168,104 @@ class Product:
 # ------------------------ #
 
     @staticmethod
+    def all_product_data():
+
+        query = "select * from products"
+
+        result = ConnectToDB(query).select_all()
+
+        return result
+
+# ------------------------ #
+
+    @staticmethod
+    def show_all_product():
+        
+        product_data = Product.all_product_data()
+
+        product_id_list = []
+
+        for index, info in enumerate(product_data, start=1):
+
+            print_color(f"{index}. Product ID: {info[0]} --- Brand: {info[2]} --- model: {info[3]} --- quantity: {info[4]} --- price: '{info[6]}'$.", "m")
+
+            category = Category(info[1])
+
+            if not category.category_parent:
+                print_color(f"category: {category.category_name}.", "m")
+
+            else:
+                parent = Category(category.category_parent)
+
+                print_color(f"category: {category.category_name} ---> {parent.category_name}", "m")
+
+            print_color("-" * 40, "b")
+
+            product_id_list.append(info[0])
+
+        return product_id_list          # use it for edit product
+
+# ------------------------ #
+
+    @staticmethod
     def add_new_product():
-        pass
+        
+        category = Category.show_all_category()
+
+        while True:
+
+            category_id = input("\nPlease enter category id for add new product: ")
+
+            try:
+
+                if int(category_id) in category:
+
+                    category_id = int(category_id)
+
+                    category_object = Category(category_id)
+
+                    parent_object = Category(category_object.category_parent)
+
+                    if  not category_object.category_parent:
+
+                        print_color(f"category name: {category_object.category_name}", "y")
+
+
+                    else:
+
+                        print_color(f"category name: {category_object.category_name} ---> {parent_object.category_name}.", "y")
+
+                    while True:
+
+                        are_you_sure = input("\nAre you sure? (yes, no): ")
+
+                        if are_you_sure in ("yes", "y"):
+                            break
+
+                        elif are_you_sure in ("no", "n"):
+                            print_color("Transaction cancelled.")
+                            return None
+                        
+                        else:
+                            print_color("yes or no is accepted.")
+                            
+                        break
+
+                else:
+
+                    print_color("Invalid input please focus a bit more.")
+
+            except ValueError:
+                print_color("Please enter vaild number.")
+
+
+
+        brand = input("\nEnter brand of new product: ")
+
+        model = input("\nEnter model of new product: ")
+
+        while True:
+            pass
 
 # ------------------------ #
 
@@ -216,17 +312,60 @@ class Category:
         
         data = Category.all_category_data()
 
+        category_id_list = []
+
         for index, info in enumerate(data, start= 1):
 
-            print_color(f"{index}. category id: {info[0]} --- category name: {info[1]} --- description: '{info[2]}' --- category parent: {info[3]}", "m")
+            print_color(f"{index}. category id: {info[0]} --- category name: {info[1]} --- category parent: {info[3]}", "m")
+
+            print(f"description: {convert(info[2])}")
 
             print_color("-" * 40, "b")
+
+            category_id_list.append(info[0])
+
+        return category_id_list
             
 # ------------------------ #
 
     @staticmethod
     def add_new_category():
-        pass
+
+        print_color("This is all category: ", "y")
+
+        category_data = Category.show_all_category()
+
+        name = input("\nPlease enter category name: ")
+
+        description = input("\nPlease enter description: ")
+
+        while True:
+
+            parent_id = input("\nIf your category has parent please enter id of that (iPhone -> smart phone): ")
+
+            if parent_id == "":
+                parent_id = None
+                break
+
+            elif not parent_id.isdigit():
+                print_color("Parent id must be a int number.")
+                continue
+
+            parent_id = int(parent_id)
+
+            if parent_id not in category_data:
+                print_color("Please enter valid parent id.")
+
+            else:
+                break
+
+        query = "insert into productcategory (categoryname, description, parentID) values (%s, %s, %s)"
+
+        params = (name, description, parent_id)
+
+        ConnectToDB(query, *params).insert()
+
+        print_color("New category add successfully.", "g")
 
 # ------------------------ #
 
@@ -472,7 +611,15 @@ class User:
 # ------------------------------------------------------ #
 
 class Admin(User):
-    pass
+    
+    def __init__(self, username):
+        super().__init__(username)
+
+    def add_new_category(self):
+        Category.add_new_category()
+
+    def show_all_category(self):
+        Category.show_all_category()
 
 # ------------------------------------------------------ #
 
@@ -494,4 +641,8 @@ class Admin(User):
 
 # ali.current_balance()
 
-Category.show_all_category()
+# Category.add_new_category()
+
+# Category.show_all_category()
+
+Product.add_new_product()
