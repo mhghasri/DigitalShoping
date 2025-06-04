@@ -8,7 +8,7 @@
     DB_NAME=your_database_name_here
 
 
-# Database Setup for mh-digitalshop
+# Database Setup for digitalshop
 
 This repository contains the SQL dump file for the `digitalshop` database.
 
