@@ -135,13 +135,217 @@ class ConnectToDB:
 
 # ------------------------------------------------------ #
 
-class ShipingCart:
-    
-    def __init__(self):
-        pass
+class Order:
+
+    def __init__(self, user_id):
+        self.user_id = user_id
+        self.cart_id = ShipingCart.get_open_cart_id(user_id)
+
 # ------------------------ #
 
-    def 
+    def create_order(self):
+        pass
+
+# ------------------------ #
+
+# ------------------------------------------------------ #
+
+class ShipingCart:
+    
+    def __init__(self, user_id):
+        self.user_id = user_id
+        self.cart_id = None
+
+# ------------------------ #
+
+    def get_or_create_cart(self):
+
+        '''this method select cart where is open and userid = self.userid if it exist return it else make it and return it'''
+
+        query = "select * from carts where UserID = %s and status = %s"
+
+        params = (self.user_id, 'open')
+
+        cart_data = ConnectToDB(query, *params).select_choosen()
+
+        if cart_data:
+
+            self.cart_id = cart_data[0]
+
+            return cart_data
+        
+        # make a cart
+
+        query = "INSERT INTO Carts (UserID) values (%s)"
+
+        params = (self.user_id, )
+
+        ConnectToDB(query, *params).insert()
+
+
+        # get new cart
+
+        query = "select * from carts where UserID = %s and status = %s"
+
+        params = (self.user_id, 'open')
+
+        cart_data = ConnectToDB(query, *params).select_choosen()
+
+        if cart_data:
+            self.cart_id = cart_data[0]
+
+            return cart_data
+        
+        # if do not make it
+
+        return None
+
+# ------------------------ #
+    
+    def add_to_cart(self, product_id, quantity):
+
+        '''This method add or update new item to cartitems'''
+
+        query = """INSERT INTO CartItems (CartID, ProductID, Quantity)
+                   VALUES (%s, %s, %s)
+                   ON DUPLICATE KEY UPDATE Quantity = Quantity + VALUES(Quantity)
+                """
+        
+        params = (self.cart_id, product_id, quantity)
+
+        ConnectToDB(query, *params).insert()
+
+        # query = "select * from productitems where CartID = %s and productid = %s"
+
+        # params = (self.cart_id, product_id)
+
+        # cart_item_data = ConnectToDB(query, *params).select_choosen()
+
+        # if not cart_item_data:
+
+        #     query = "insert into productitems (CartID, productID, quantity) values (%s, %s, %s)"
+
+        #     params = (self.cart_id, product_id, quantity)
+
+        #     ConnectToDB(query, *params).insert()
+
+        # else:
+
+        #     quantity += cart_item_data[3]
+
+        #     query = "update productitems set quantity = %s where cartID = %s and productid = %s"
+
+        #     params = (quantity, self.cart_id, product_id)
+
+        #     ConnectToDB(query, *params).update()
+
+# ------------------------ #
+
+    def view_cart(self):
+
+        self.get_or_create_cart()
+
+        query = "SELECT ProductID, Quantity FROM CartItems WHERE CartID = %s"
+
+        params = (self.cart_id, )
+
+        cart_items = ConnectToDB(query, *params).select_all()
+
+        if not cart_items:
+
+            print_color("🛒 Your cart is empty.")
+            print_color("Start adding products to place an order.", "c")
+
+            return
+
+        total = 0
+
+        print_color("Your carts: ", "c")
+
+        print_color("-" * 40, "b")
+
+        for item in cart_items:
+
+            product_object = Product(item[0])
+
+            category_object = Category(product_object.category_id)
+
+            quantity = item[1]
+
+            if category_object.category_parent:
+
+                parent = Category(category_object.category_parent)
+
+                print_color(f"{category_object.category_name} ---> {parent.category_name}", "m")
+
+            else:
+
+                print_color(f"{category_object.category_name}", "m")
+
+            print_color(f"ID: {product_object.product_id} --- Brand: {product_object.brand} --- model: {product_object.model} --- price: '{product_object.sell_price}'$ --- quantity: {quantity}.", "c")
+
+            print_color("-" * 40, "b")
+
+            amount = product_object.sell_price * quantity
+
+            total += amount
+
+        print_color(f"💰 Final price: '{total}'$.", "c")
+
+        return total
+
+# ------------------------ #
+    
+    def checkout_cart(self):
+
+        final_price = self.view_cart()
+
+        user_object = User.user_data_by_id(self.user_id)
+
+# ------------------------ #
+
+    def get_total_amount(self):
+
+        self.get_or_create_cart()
+
+        query = "SELECT ProductID, Quantity FROM CartItems WHERE CartID = %s"
+
+        params = (self.cart_id, )
+
+        cart_items = ConnectToDB(query, *params).select_all()
+
+        if not cart_items:
+
+            return 0
+        
+        total = 0
+
+        for item in cart_items:
+
+            product_object = Product(item[0])
+
+            category_object = Category(product_object.category_id)
+
+            quantity = item[1]
+
+            amount = product_object.sell_price * quantity
+
+            total += amount
+
+        return total
+
+# ------------------------ #
+    
+    @staticmethod
+    def get_open_cart_id(user_id):
+
+        query = "SELECT CartID from Carts where UserID = %s AND Status = %s"
+
+        params = (user_id, 'open')
+
+        result = ConnectToDB(query, *params).select_choosen()
+
+        return result[0] if result else None
 
 # ------------------------ #
 
@@ -585,38 +789,10 @@ class User:
 
                     break
 
-        amount = quantity * product_obj.sell_price
-
-        if amount > self.balance:
-
-            print_color(f"Not enough money. current balance: '{self.balance}'$. amount: {amount}.")
-
-            quantity = self.balance // product_obj.sell_price
-
-            print_color(f"But you can buy {quantity} of this product.", "g")
-
-            while True:
-                yes_or_no = input("\nAre your sure to buy it? (yes, no): ")
-
-                if yes_or_no in ("yes", "no"):
-
-                    break
-
-                else:
-                    print_color("Just yes/no accepted. Please try again.")
-
-            if yes_or_no == "no":
-                print_color("Tranaction successfully canceled.", "g")
-
-                return None
-
-            else:
-                amount = quantity * product_obj.sell_price
-
-        self.update_balance(amount)
-
-
-
+        # must add to cart
+        # must update quantity of product
+        # must update cart items
+        # if user delet cart must update quantity of product
 
 # ------------------------ #
 
@@ -815,4 +991,6 @@ ali = User("alinorouzi")
 
 # Product.show_all_product()
 
-ali.buy_product()
+cart_data = ShipingCart(ali.userid)
+
+cart_data.view_cart()
