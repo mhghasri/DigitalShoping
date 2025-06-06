@@ -251,12 +251,14 @@ class ShipingCart:
 
         cart_items = ConnectToDB(query, *params).select_all()
 
+        all_product_id = []
+
         if not cart_items:
 
             print_color("🛒 Your cart is empty.")
             print_color("Start adding products to place an order.", "c")
 
-            return
+            return False
 
         total = 0
 
@@ -286,13 +288,15 @@ class ShipingCart:
 
             print_color("-" * 40, "b")
 
+            all_product_id.append(product_object.product_id)
+
             amount = product_object.sell_price * quantity
 
             total += amount
 
         print_color(f"💰 Final price: '{total}'$.", "c")
 
-        return total
+        return (total, all_product_id)
 
 # ------------------------ #
     
@@ -333,6 +337,128 @@ class ShipingCart:
             total += amount
 
         return total
+
+# ------------------------ #
+
+    def edit_cart(self):
+
+        cart = self.view_cart()
+        
+        if not cart:
+
+            return False
+        
+        while True:
+
+            product_id = input("Please enter product id to want change: ")
+
+            try:
+                if int(product_id) in cart[1]:
+                    break
+
+                else:
+
+                    print_color("Please enter valid product id.")
+
+            except:
+
+                print_color("Please enter valid product id.")
+
+            
+        
+        print_color(f"1. increase cart\n\n2. decrease cart.", "c")
+
+        while True:
+
+            in_or_de = input("\nEnter your choice: ")
+
+            if in_or_de in ("1", "2"):
+                break
+
+            else:
+                print_color("Invalid input. Please enter valid number.")
+                
+
+        while True:
+
+            try:
+
+                quantity = int(input("\nPlease enter your you want to change: "))
+
+                break
+
+            except ValueError:
+
+                print_color("Please enter valid number.")
+
+
+        if in_or_de == "2":
+
+            quantity = -quantity
+
+        self.update_cart_items(product_id, quantity)
+
+# ------------------------ #
+
+    def update_cart_items(self, product_id: int, new_quantity: int):
+        """Upate quantity of a product in the cart and adjust product stock accordingly"""
+
+        self.get_or_create_cart()
+
+        query = "SELCT Quantity from Carttems Where cartid = %s and productid = %s"
+
+        params = (self.cart_id, product_id)
+
+        result = ConnectToDB(query, *params).select_choosen()
+
+        if not result:
+            print_color("This product is not in your cart. Please buy it first.")
+
+            return
+        
+        old_quantity = result[0]
+
+        delta = new_quantity - old_quantity
+
+        # get product quantity from data base
+
+        product = Product(product_id)
+
+        current_stock = product.quantity
+
+        # if delta < 0 its mean increase Warehouse and decrease cart
+
+        if delta < 0:
+            
+            query = "UPDATE Products SET Quantity = Quantity + %s WHERE ProductID = %s"
+
+            params = (abs(delta), product_id)
+
+            ConnectToDB(query, *params).update()
+
+        # if delta > 0 its mean decrease warhouse and increase cart
+
+        elif delta > 0:
+
+            if current_stock < delta:
+                print_color("Not enough stock available to increase quantity.", "r")
+                return
+            
+            # decrease from warhouse
+            
+            query = "UPDATE Products SET Quantity = Quantity - %s WHERE ProductID = %s"
+
+            params = (delta, product_id)
+            
+            ConnectToDB(query, *params).update()
+
+        query = "update cartitems set quantity = %s where cartid = %s and productid = %s"
+
+        params = (new_quantity, self.cart_id, product_id)
+
+        ConnectToDB(query, *params).update()
+
+        print_color("Cart item updated successfully.", "g")
 
 # ------------------------ #
     
@@ -993,4 +1119,4 @@ ali = User("alinorouzi")
 
 cart_data = ShipingCart(ali.userid)
 
-cart_data.view_cart()
+cart_data.edit_cart()
