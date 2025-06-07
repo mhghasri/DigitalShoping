@@ -143,8 +143,42 @@ class Order:
 
 # ------------------------ #
 
-    def create_order(self):
-        pass
+    def create_order(self, total_amount):
+        
+        order_query = "insert into orders (Userid, TotalAmount) values (%s, %s)"
+
+        params = (self.user_id, total_amount)
+
+        ConnectToDB(order_query, *params).insert()
+
+        order_id_query = "SELECT OrdersID FROM orders WHERE UserID = %s ORDER BY OrdersID DESC LIMIT 1"
+
+        params = (self.user_id, )
+
+        order_id = ConnectToDB(order_id_query, *params).select_choosen()[0]
+
+        details_query = """
+                    INSERT INTO orderdetail (OrderID, ProductID, Quantity)
+                    SELECT %s, productid, quantity FROM cartitems WHERE cartid = %s
+        """
+
+        params = (order_id, self.cart_id)
+
+        ConnectToDB(details_query, *params).insert()
+
+        query = "delete from cartitems where cartid = %s"
+
+        params = (self.cart_id,)
+
+        ConnectToDB(query, *params).delete()
+
+        query = "delete from carts where cartid = %s"
+
+        params = (self.cart_id,)
+
+        ConnectToDB(query, *params).delete()
+
+        print_color(f"Your order compelete with orderid: {order_id}", "c")
 
 # ------------------------ #
 
@@ -301,11 +335,53 @@ class ShipingCart:
 # ------------------------ #
     
     def checkout_cart(self):
+            
+        try:
 
-        final_price = self.view_cart()
+            final_price = self.view_cart()[0]
+
+        except TypeError:
+
+            return False
 
         user_object = User.user_data_by_id(self.user_id)
 
+        print_color("This is your cart.", "c")
+
+        print_color(f"1. pay out cart\n\n2. cancel cart.", "c")
+
+        while True:
+
+            pay_or_canc = input("\npay out or cancel? (1, 2): ")
+
+            if pay_or_canc in ("1", "2"):
+
+                break
+
+            else:
+
+                print_color("Invalid input please try again.")
+
+        if pay_or_canc == "2":
+
+            print_color("cart pay out successfully canceld.", "g")
+
+            return
+        
+        if final_price > user_object.balance:
+
+            print_color("you dont have neough balance. please charge your balance.")
+
+            user_object.current_balance()
+
+            return False
+        
+        order = Order(self.user_id)
+
+        order.create_order(final_price)
+
+        user_object.update_balance(final_price)
+            
 # ------------------------ #
 
     def get_total_amount(self):
@@ -341,121 +417,105 @@ class ShipingCart:
 # ------------------------ #
 
     def edit_cart(self):
-
         cart = self.view_cart()
-        
         if not cart:
-
             return False
-        
+
+        valid_product_ids = cart[1]
+
+
         while True:
-
-            product_id = input("Please enter product id to want change: ")
-
+            product_id_input = input("\nPlease enter product id you want to change: ")
             try:
-                if int(product_id) in cart[1]:
+                product_id = int(product_id_input)
+                if product_id in valid_product_ids:
                     break
-
                 else:
-
-                    print_color("Please enter valid product id.")
-
-            except:
-
-                print_color("Please enter valid product id.")
-
-            
-        
-        print_color(f"1. increase cart\n\n2. decrease cart.", "c")
-
-        while True:
-
-            in_or_de = input("\nEnter your choice: ")
-
-            if in_or_de in ("1", "2"):
-                break
-
-            else:
-                print_color("Invalid input. Please enter valid number.")
-                
-
-        while True:
-
-            try:
-
-                quantity = int(input("\nPlease enter your you want to change: "))
-
-                break
-
+                    print_color("Product ID not found in your cart. Try again.", "r")
             except ValueError:
+                print_color("Invalid input. Please enter a valid product ID.", "r")
 
-                print_color("Please enter valid number.")
+
+        print_color("\n1. Increase product quantity\n\n2. Decrease product quantity", "c")
+        while True:
+            choice = input("\nEnter your choice (1 or 2): ")
+            if choice in ("1", "2"):
+                break
+            else:
+                print_color("Invalid input. Please enter 1 or 2.", "r")
 
 
-        if in_or_de == "2":
+        while True:
+            quantity_input = input("\nPlease enter the quantity to change: ")
+            try:
+                quantity = int(quantity_input)
+                if quantity <= 0:
+                    print_color("Quantity must be a positive number.", "r")
+                    continue
+                break
+            except ValueError:
+                print_color("Invalid number. Please enter a valid integer.", "r")
 
+
+        if choice == "2":
             quantity = -quantity
+
 
         self.update_cart_items(product_id, quantity)
 
+
 # ------------------------ #
 
-    def update_cart_items(self, product_id: int, new_quantity: int):
-        """Upate quantity of a product in the cart and adjust product stock accordingly"""
+    def update_cart_items(self, product_id: int, delta: int):
+        """Update quantity of a product in the cart and adjust product stock accordingly"""
 
         self.get_or_create_cart()
 
-        query = "SELCT Quantity from Carttems Where cartid = %s and productid = %s"
-
+        query = "SELECT Quantity from CartItems Where cartid = %s and productid = %s"
         params = (self.cart_id, product_id)
-
         result = ConnectToDB(query, *params).select_choosen()
 
         if not result:
             print_color("This product is not in your cart. Please buy it first.")
-
             return
-        
+
         old_quantity = result[0]
+        new_quantity = old_quantity + delta
 
-        delta = new_quantity - old_quantity
-
-        # get product quantity from data base
+        if new_quantity < 0:
+            print_color("Invalid operation. Resulting quantity would be negative.", "r")
+            return
 
         product = Product(product_id)
-
         current_stock = product.quantity
 
-        # if delta < 0 its mean increase Warehouse and decrease cart
-
         if delta < 0:
-            
+            # Increase warehouse, decrease cart
             query = "UPDATE Products SET Quantity = Quantity + %s WHERE ProductID = %s"
-
             params = (abs(delta), product_id)
-
             ConnectToDB(query, *params).update()
 
-        # if delta > 0 its mean decrease warhouse and increase cart
-
         elif delta > 0:
-
             if current_stock < delta:
                 print_color("Not enough stock available to increase quantity.", "r")
                 return
-            
-            # decrease from warhouse
-            
-            query = "UPDATE Products SET Quantity = Quantity - %s WHERE ProductID = %s"
 
+            # Decrease warehouse, increase cart
+            query = "UPDATE Products SET Quantity = Quantity - %s WHERE ProductID = %s"
             params = (delta, product_id)
-            
             ConnectToDB(query, *params).update()
 
-        query = "update cartitems set quantity = %s where cartid = %s and productid = %s"
+        # Delete cart if quantity == 0
+        if new_quantity == 0:
+            query = "DELETE FROM CartItems WHERE CartID = %s AND ProductID = %s"
+            params = (self.cart_id, product_id)
+            ConnectToDB(query, *params).delete()  # متد delete لازم است
+            print_color("Product removed from cart because quantity became zero.", "c")
+            return
 
+        # Update cart item quantity
+        query = "UPDATE CartItems SET Quantity = %s WHERE CartID = %s AND ProductID = %s"
         params = (new_quantity, self.cart_id, product_id)
-
         ConnectToDB(query, *params).update()
 
         print_color("Cart item updated successfully.", "g")
@@ -775,6 +835,8 @@ class User:
         self.email = user_info[4]
         self.permision = user_info[5]
         self.balance = user_info[6]
+
+        self.cart = self.user_cart()
 # ------------------------ #
 
     def user_data(self):
@@ -786,6 +848,14 @@ class User:
         result = user.select_choosen()
 
         return result       
+
+# ------------------------ #
+
+    def user_cart(self):
+
+        cart = ShipingCart(self.userid)
+
+        return cart
 
 # ------------------------ #
 
@@ -915,10 +985,38 @@ class User:
 
                     break
 
-        # must add to cart
-        # must update quantity of product
-        # must update cart items
-        # if user delet cart must update quantity of product
+
+        self.cart.get_or_create_cart()
+
+        self.cart.add_to_cart(product_obj.product_id, quantity)
+
+        new_quantity = product_obj.quantity - quantity
+
+        query = "update products set quantity = %s where productid = %s"
+
+        params = (new_quantity, product_id)
+
+        ConnectToDB(query, *params).update()
+
+        print_color("Successfully aded to cart.", "g")
+
+# ------------------------ #
+
+    def edit_cart(self):
+
+        self.cart.edit_cart()
+
+# ------------------------ #
+
+    def view_cart(self):
+        
+        self.cart.view_cart()
+
+# ------------------------ #
+
+    def check_out_cart(self):
+
+        self.cart.checkout_cart()
 
 # ------------------------ #
 
@@ -1109,6 +1207,8 @@ class Admin(User):
 
 ali = User("alinorouzi")
 
+hadi = User("hadiahmadi")
+
 # ali.current_balance()
 
 # Category.add_new_category()
@@ -1117,6 +1217,18 @@ ali = User("alinorouzi")
 
 # Product.show_all_product()
 
-cart_data = ShipingCart(ali.userid)
+# cart_data = ShipingCart(ali.userid)
 
-cart_data.edit_cart()
+# cart_data.checkout_cart()
+
+# ali.buy_product()
+
+# hadi.buy_product()
+
+# ali.view_cart()
+
+# hadi.view_cart()
+
+# hadi.edit_cart()
+
+# hadi.check_out_cart()
