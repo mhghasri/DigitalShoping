@@ -145,9 +145,13 @@ class Order:
 
     def create_order(self, total_amount):
         
-        order_query = "insert into orders (Userid, TotalAmount) values (%s, %s)"
+        order_query = "insert into orders (Userid, TotalAmount, Profit) values (%s, %s, %s)"
 
-        params = (self.user_id, total_amount)
+        amount = total_amount / 1.3
+
+        profit = total_amount - amount
+
+        params = (self.user_id, total_amount, profit)
 
         ConnectToDB(order_query, *params).insert()
 
@@ -179,6 +183,57 @@ class Order:
         ConnectToDB(query, *params).delete()
 
         print_color(f"Your order compelete with orderid: {order_id}", "c")
+
+# ------------------------ #
+
+    def user_order_id(self):
+        query = "select ordersid, status from orders where userid = %s"
+
+        params = (self.user_id, )
+
+        order_id = ConnectToDB(query, *params).select_all()
+
+        order_id_status_list = []
+
+        for id, status in order_id:
+
+            order_id_status_list.append((id, status))
+
+        return order_id_status_list
+
+# ------------------------ #
+
+    def show_order_details(self):
+
+        order_id_status = self.user_order_id()
+
+        if not order_id_status:
+
+            print_color("You dont have any order.")
+
+            return
+
+        for orderid, status in order_id_status:
+
+            query = "select productID, quantity from orderdetail where orderID = %s"
+
+            params = (orderid, )
+
+            result = ConnectToDB(query, *params).select_all()
+
+            print_color(f"Order id: {orderid} --- status: {status}.", "c")
+            
+            for index, order_detail in enumerate(result, start=1):
+
+                product = Product(order_detail[0])
+
+                quantity = order_detail[1]
+
+                amount = quantity * product.sell_price
+
+                print_color(f"{index}. product id: {product.product_id} --- brand: {product.brand} --- model: {product.model} --- price: '{product.sell_price}'$ --- quantity: {quantity} --- final price: '{amount}'$.", "m")
+
+                print_color("-" * 40, "b")
 
 # ------------------------ #
 
@@ -837,6 +892,8 @@ class User:
         self.balance = user_info[6]
 
         self.cart = self.user_cart()
+
+        self.order = self.user_order()
 # ------------------------ #
 
     def user_data(self):
@@ -856,6 +913,14 @@ class User:
         cart = ShipingCart(self.userid)
 
         return cart
+
+# ------------------------ #
+
+    def user_order(self):
+
+        order = Order(self.userid)
+
+        return order
 
 # ------------------------ #
 
@@ -1017,6 +1082,12 @@ class User:
     def check_out_cart(self):
 
         self.cart.checkout_cart()
+
+# ------------------------ #
+
+    def show_orders(self):
+
+        self.order.show_order_details()
 
 # ------------------------ #
 
@@ -1207,6 +1278,8 @@ class Admin(User):
 
 ali = User("alinorouzi")
 
+mh = User("mhghasri")
+
 hadi = User("hadiahmadi")
 
 # ali.current_balance()
@@ -1227,8 +1300,22 @@ hadi = User("hadiahmadi")
 
 # ali.view_cart()
 
+# ali.update_balance(28000, "charge")
+
 # hadi.view_cart()
 
 # hadi.edit_cart()
 
+# mh.edit_cart()
+
 # hadi.check_out_cart()
+
+# ali.check_out_cart()
+
+# Order(ali.userid).show_order_details()
+
+# Order(mh.userid).show_order_details()
+
+# ali.show_orders()
+
+# mh.show_orders()
