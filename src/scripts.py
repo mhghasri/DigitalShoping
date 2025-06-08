@@ -135,6 +135,158 @@ class ConnectToDB:
 
 # ------------------------------------------------------ #
 
+class Refund:
+
+    def __init__(self, user_id):
+        self.user_id = user_id
+
+        self.order = self.create_order_object()
+
+# ------------------------ #
+
+    def create_order_object(self):
+
+        order = Order(self.user_id)
+
+        return order
+
+# ------------------------ #
+
+    def refund_item(self):
+
+        order_id_status = self.order.user_order_id()
+
+        if not order_id_status:
+
+            print_color("You dont have any (delivered) order.")
+
+            return
+        
+        order_id_list = []
+        
+        for order_id, status in order_id_status:
+
+            if status == "delivered":
+
+                order_id_list.append(order_id)
+
+        for orderid in order_id_list:
+
+            query = "select productID, quantity from orderdetail where orderID = %s"
+
+            params = (orderid, )
+
+            result = ConnectToDB(query, *params).select_all()
+
+            print_color(f"Order id: {orderid} --- status: 'delivered'.", "c")
+            
+            for index, order_detail in enumerate(result, start=1):
+
+                product = Product(order_detail[0])
+
+                quantity = order_detail[1]
+
+                amount = quantity * product.sell_price
+
+                print_color(f"{index}. product id: {product.product_id} --- brand: {product.brand} --- model: {product.model} --- price: '{product.sell_price}'$ --- quantity: {quantity} --- final price: '{amount}'$.", "m")
+
+                print_color("-" * 40, "b")
+
+
+        while True:
+
+            order_ID = input("\nEnter your order id for refunding: ")
+
+            try:
+
+                if int(order_ID) in order_id_list:     
+                    
+                    break
+
+                else:
+
+                    print_color("Invalid input please try again.")
+
+            except ValueError:
+
+                print_color("Please enter valid number.")
+
+        query = "select * from orders where ordersID = %s"
+
+        params = (order_ID, )
+
+        order_table = ConnectToDB(query, *params).select_choosen()
+
+        user = User.user_data_by_id(order_table[1])
+
+        total_amount = order_table[3]
+
+        print_color(f"Order id: {order_ID} --- status: 'delivered'.", "c")
+
+        query = "select productID, quantity from orderdetail where orderID = %s"
+
+        params = (order_ID, )
+
+        order_detail_table = ConnectToDB(query, *params).select_all()
+
+        for index, detail in enumerate(order_detail_table, start=1):
+
+                product = Product(detail[0])
+
+                quantity = detail[1]
+
+                amount = quantity * product.sell_price
+
+                print_color(f"{index}. product id: {product.product_id} --- brand: {product.brand} --- model: {product.model} --- price: '{product.sell_price}'$ --- quantity: {quantity} --- final price: '{amount}'$.", "m")
+
+                print_color("-" * 40, "b")
+
+        while True:
+
+            yes_or_no = input("\nAre you sure to refund it? it cost 10% tax for refunding. ('yes', 'no'): ")
+
+            if yes_or_no in ("yes", "no"):
+
+                break
+
+            else:
+
+                print_color("Invalid input please try again later.")
+
+        if yes_or_no == "no":
+
+            print_color("transaction successfully canceled.", "g")
+
+            return
+        
+        for detail in order_detail_table:
+
+            product = Product(detail[0])
+
+            quantity = detail[1]
+
+            refund_query = "update products set quantity = quantity + %s where productid = %s "
+
+            params = (quantity, product.product_id)
+
+            ConnectToDB(refund_query, *params).update()
+
+        amount = total_amount * Decimal("0.9")
+
+        cancel_query = "update orders set status = %s where ordersid = %s"
+
+        params = ('canceled', order_ID)
+
+        ConnectToDB(cancel_query, *params).update()
+
+        print_color("Refund processed successfully. 10% tax applied.", "g")
+
+        user.update_balance(amount, "refund")
+
+# ------------------------ #
+            
+# ------------------------------------------------------ #
+
 class Order:
 
     def __init__(self, user_id):
@@ -234,6 +386,180 @@ class Order:
                 print_color(f"{index}. product id: {product.product_id} --- brand: {product.brand} --- model: {product.model} --- price: '{product.sell_price}'$ --- quantity: {quantity} --- final price: '{amount}'$.", "m")
 
                 print_color("-" * 40, "b")
+
+# ------------------------ #
+
+    def show_order_detail_admin(self, status: str="pending"):
+
+        query = "select OrdersID, UserID, TotalAmount, status, profit from orders where status = %s"
+
+        params = (status, )
+
+        order_table_result = ConnectToDB(query, *params).select_all()
+
+        query = "select OrderID, productID, Quantity from orderdetail"
+
+        order_detail_table_result = ConnectToDB(query).select_all()
+
+        order_id_list = []
+
+        for order in order_table_result:
+
+            order_id = order[0]
+            user_id = order[1]
+            total_amount = order[2]
+            status = order[3]
+            profit = order[4]
+
+            order_id_list.append(order_id)
+
+            user = User.user_data_by_id(user_id)
+
+            print_color(f"order id: {order_id} --- user: {user.username} --- total amount: '{total_amount}'$ --- status: {status} --- profit: '{profit}'$.", "y")
+
+            for detail in order_detail_table_result:
+
+                if detail[0] == order_id:
+
+                    product = Product(detail[1])
+                    quantity = detail[2]
+
+                    category = Category(product.category_id)
+
+                    if category.category_parent:
+
+                        parent = Category(category.category_parent)
+
+                        print_color(f"category: {category.category_name} ---> {parent.category_name}.", "m")
+
+                    else:
+
+                        print_color(f"category: {category.category_name}.", "m")
+
+                    amount = quantity * product.sell_price
+                    
+                    print_color("-" * 20, "g")
+
+                    print_color(f"product id: {product.product_id} --- brnad: {product.brand} --- model: {product.model} --- sell price: '{product.sell_price}'$ --- buy price: '{product.buy_price}'$ --- quantity: {quantity} --- final price: '{amount}'$.", "m")
+
+                    print_color("-" * 40, "b")
+
+        return order_id_list
+
+# ------------------------ #
+
+    def update_order(self):
+        
+        order_Id = self.show_order_detail_admin()
+
+        while True:
+
+            order_id = input("\nPlease enter your id for update status for delivered: ")
+
+            try:
+
+                if int(order_id) in order_Id:
+
+                    query = "update orders set status = %s where OrdersID = %s"
+
+                    params = ('delivered', order_id)
+
+                    ConnectToDB(query, *params).update()
+
+                    break
+
+                else:
+
+                    print_color("Please enter valid number.")
+
+            except ValueError:
+
+                print_color("Please enter integer number.")
+
+                
+
+        print_color(f"order id: {order_id} successfully chenged to delivered.", "g")
+
+# ------------------------ #
+
+    def search_order(self):
+            
+        while True:
+            
+            try:
+
+                order_id = int(input("\nPlease enter order id: "))
+
+            except ValueError:
+
+                print_color("invalid input please enter integer number.")
+
+            else:
+
+                break
+
+        query = "select * from orders where ordersID = %s"
+
+        params = (order_id, )
+
+        try:
+
+            order_result = ConnectToDB(query, *params).select_choosen()
+
+        except Exception as E:
+
+            print_color(f"Invalid order id.")
+
+            return
+        
+        if not order_result:
+
+            print_color("no data found.")
+
+            return
+
+        order_ID = order_result[0]
+
+        query = "select * from orderdetail where orderid = %s"
+
+        params = (order_ID, )
+
+        oreder_detail_result = ConnectToDB(query, *params).select_all()
+
+        user = User.user_data_by_id(order_result[1])
+
+        total_amount = order_result[3]
+
+        status = order_result[4]
+
+        profit = order_result[5]
+
+        print_color(f"order id: {order_id} --- user: {user.username} --- total amount: '{total_amount}'$ --- status: {status} --- profit: '{profit}'$.", "y")
+
+        for index, detail in enumerate(oreder_detail_result, start=1):
+
+            product = Product(detail[2])
+            quantity = detail[3]
+
+            category = Category(product.category_id)
+
+            if category.category_parent:
+
+                parent = Category(category.category_parent)
+
+                print_color(f"category: {category.category_name} ---> {parent.category_name}.", "m")
+
+            else:
+
+                print_color(f"category: {category.category_name}.", "m")
+
+            amount = quantity * product.sell_price
+                    
+            print_color("-" * 20, "g")
+
+            print_color(f"{index}. product id: {product.product_id} --- brnad: {product.brand} --- model: {product.model} --- sell price: '{product.sell_price}'$ --- buy price: '{product.buy_price}'$ --- quantity: {quantity} --- final price: '{amount}'$.", "m")
+
+            print_color("-" * 40, "b")
 
 # ------------------------ #
 
@@ -1243,10 +1569,6 @@ class User:
 
 # ------------------------ #
 
-
-
-# ------------------------ #
-
 # ------------------------------------------------------ #
 
 class Admin(User):
@@ -1257,8 +1579,36 @@ class Admin(User):
     def add_new_category(self):
         Category.add_new_category()
 
+# ------------------------ #
+
     def show_all_category(self):
         Category.show_all_category()
+
+# ------------------------ #
+
+    def show_orders_pending(self):
+        
+        self.order.show_order_detail_admin()
+
+# ------------------------ #
+
+    def show_orders_delivered(self):
+
+        self.order.show_order_detail_admin("delivered")
+
+# ------------------------ #
+
+    def update_orders(self):
+
+        self.order.update_order()
+
+# ------------------------ #
+
+    def search_order(self):
+
+        self.order.search_order()
+
+# ------------------------ #
 
 # ------------------------------------------------------ #
 
@@ -1278,7 +1628,7 @@ class Admin(User):
 
 ali = User("alinorouzi")
 
-mh = User("mhghasri")
+mh = Admin("mhghasri")
 
 hadi = User("hadiahmadi")
 
@@ -1314,8 +1664,22 @@ hadi = User("hadiahmadi")
 
 # Order(ali.userid).show_order_details()
 
-# Order(mh.userid).show_order_details()
+# Order(mh.userid).update_order()
 
 # ali.show_orders()
 
 # mh.show_orders()
+
+# mh.show_orders_delivered()
+
+# Order(mh.userid).search_order()
+
+# moham = Admin.login()
+
+# moham.search_order()
+
+# Refund(ali.userid).refund_item()
+
+# Refund(mh.userid).refund_item()
+
+mh.search_order()

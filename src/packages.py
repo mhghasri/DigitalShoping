@@ -5,6 +5,7 @@ from datetime import datetime
 import pymysql
 import arabic_reshaper
 from bidi.algorithm import get_display
+from decimal import Decimal
 
 # ---------------------------- #
 
