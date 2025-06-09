@@ -284,6 +284,65 @@ class Refund:
         user.update_balance(amount, "refund")
 
 # ------------------------ #
+
+    def user_refund_id(self):
+
+        query = "select ordersid, status from orders where userid = %s and status = %s"
+
+        params = (self.user_id, "canceled")
+
+        order_id = ConnectToDB(query, *params).select_all()
+
+        order_id_status_list = []
+
+        for id, status in order_id:
+
+            order_id_status_list.append((id, status))
+
+        return order_id_status_list    
+
+# ------------------------ #
+
+    def show_refund(self):
+
+        refund_id = self.user_refund_id()
+
+        total_amount = 0
+
+        if not refund_id:
+
+            print_color("You dont have any refunded order.")
+
+            return
+
+        for orderid, status in refund_id:
+
+            query = "select productID, quantity from orderdetail where orderID = %s"
+
+            params = (orderid, )
+
+            result = ConnectToDB(query, *params).select_all()
+
+            print_color(f"Order id: {orderid} --- status: {status}.", "c")
+
+            for index, order_detail in enumerate(result, start=1):
+
+                product = Product(order_detail[0])
+
+                quantity = order_detail[1]
+
+                amount = quantity * product.sell_price
+
+                print_color(f"{index}. product id: {product.product_id} --- brand: {product.brand} --- model: {product.model} --- price: '{product.sell_price}'$ --- quantity: {quantity} --- final price: '{amount}'$.", "m")
+
+                print_color("-" * 40, "b")
+
+                total_amount += amount
+
+        print_color(f"Refunded amount: '{total_amount * 0.9}'$.", "g")
+
+
+# ------------------------ #
             
 # ------------------------------------------------------ #
 
@@ -946,9 +1005,107 @@ class Product:
 # ------------------------ #
 
     @staticmethod
-    def all_product_data():
+    def update_product():
 
-        query = "select * from products"
+        print_color("These are all product.", "y")
+        
+        Product.show_all_product("admin")
+
+        admin = Admin("mhghasri")
+
+        while True:
+
+            product_id = input("Please enter product id: ")
+
+            try:
+
+                product = Product(int(product_id))
+
+            except (ValueError, TypeError):
+
+                print_color("Invalid input please try again.")    
+
+            else:
+                break
+        
+        while True:
+
+            try:
+                quantity = int(input("\nPlease enter quantity you want to add: "))
+
+            except ValueError:
+
+                print_color("Invalid input please input valid number.")
+
+            else:
+                break
+
+        while True:
+
+            change_price = input("\nDo you want change price? ('yes', 'no'): ")
+
+            if change_price in ("yes", "no"):
+                
+                if change_price == "no":
+
+                    break
+
+                else:
+
+                    while True:
+
+                        try:
+
+                            buy_price = float(input("\nenter buy new buy price of product: "))
+
+                            product.buy_price = buy_price
+
+                            product.sell_price = buy_price * 1.3
+
+                        except ValueError:
+
+                            print_color("invalid input. please enter valid number.")
+
+                        else:
+                            break
+
+                    break
+
+            else:
+
+                print_color("invalid input. Please input just 'yes' or 'no'.")
+
+        amount = quantity * product.buy_price
+
+        if admin.balance < amount:
+
+            print_color(f"You dont have enough balance. product amount: '{amount}'$.")
+
+            admin.current_balance()
+
+            return
+        
+        query = "update products set quantity = quantity + %s, BuyPrice = %s, Sellprice = %s where productid = %s"
+
+        params = (quantity, product.buy_price, product.sell_price, product_id)
+
+        ConnectToDB(query, *params).update()
+
+        print_color("Dear admin your product update successfully.", "g")
+
+        admin.update_balance(amount, "admin_buy")
+
+# ------------------------ #
+
+    @staticmethod
+    def all_product_data(mode: str="user"):
+
+        if mode == "user":
+
+            query = "select * from products where quantity > 0"
+
+        elif mode == "admin":
+            query = "select * from products"
 
         result = ConnectToDB(query).select_all()
 
@@ -957,9 +1114,14 @@ class Product:
 # ------------------------ #
 
     @staticmethod
-    def show_all_product():
+    def show_all_product(mode: str="user"):
+
+        if mode == "user":
         
-        product_data = Product.all_product_data()
+            product_data = Product.all_product_data()
+
+        elif mode == "admin":
+            product_data = Product.all_product_data("admin")
 
         product_id_list = []
 
@@ -1098,6 +1260,95 @@ class Product:
 
         print_color("New product successfully aded to product.", "g")
         
+# ------------------------ #
+
+    @staticmethod
+    def search_product():
+
+        brand_or_model = input("\nplease enter brand or model product you want: ")
+
+        query = "SELECT * FROM products WHERE brand LIKE %s OR model LIKE %s"
+
+        params = ("%" + brand_or_model + "%", "%" + brand_or_model + "%")
+
+        result = ConnectToDB(query, *params).select_all()
+
+        if not result:
+
+            print_color("No matching products found.")
+
+            return
+        
+        '''
+        # for index, detail in enumerate(result, start=1):
+
+        #     product = Product(detail[0])
+
+        #     category = Category(detail[1])
+
+        #     if category.category_parent:
+
+        #         parent = Category(category.category_parent)
+
+        #         print_color(f"category: {category.category_name} ---> {parent.category_name}", "m")
+
+        #     else:
+
+        #         print_color(f"category: {category.category_name}.", "m")
+
+        #     print_color("-" * 20, "g")
+
+        #     print_color(f"{index}. product id: {product.product_id} --- brand: {product.brand} --- model: {product.model} --- quantity: {product.quantity} --- price: '{product.sell_price}'$.", "m")
+
+        #     print_color("-" * 40, "b")
+        
+        '''
+        
+        # لیست محصول‌ها و set برای دسته‌های یکتا (ترکیب دسته فرعی + اصلی)
+        products = []
+
+        category_set = set()
+
+        for detail in result:
+
+            product = Product(detail[0])
+
+            category = Category(detail[1])
+
+            if category.category_parent:
+
+                parent = Category(category.category_parent)
+
+                category_key = f"{category.category_name} ---> {parent.category_name}"
+            else:
+
+                category_key = category.category_name  # فقط دسته اصلی
+
+
+            category_set.add(category_key)
+
+            products.append((category_key, product))
+
+        # نمایش دسته‌بندی‌ها
+        
+        for cat_name in category_set:
+
+            print_color(f"\ncategory: {cat_name}", "c")
+
+            print_color("-" * 40, "b")
+
+            index = 1
+
+            for product_cat, product in products:
+
+                if product_cat == cat_name:
+
+                    print_color(f"{index}. product id: {product.product_id} --- brand: {product.brand} --- model: {product.model} --- quantity: {product.quantity} --- price: '{product.sell_price}'$", "m")
+                    
+                    index += 1
+
+            print_color("-" * 40, "b")        
+
 
 # ------------------------ #
 
@@ -1220,6 +1471,8 @@ class User:
         self.cart = self.user_cart()
 
         self.order = self.user_order()
+
+        self.refund = self.refund_object()
 # ------------------------ #
 
     def user_data(self):
@@ -1247,6 +1500,13 @@ class User:
         order = Order(self.userid)
 
         return order
+
+# ------------------------ #
+
+    def refund_object(self):
+        refund = Refund(self.userid)
+
+        return refund
 
 # ------------------------ #
 
@@ -1368,7 +1628,13 @@ class User:
 
             else:
                 
-                if product_obj.quantity < quantity:
+                if product_obj.quantity == 0:
+
+                    print_color("The ordered product is out of stock please turn on notification for first buyer.", "c")
+
+                    return
+                
+                elif product_obj.quantity < quantity:
 
                     print_color("not enough quantity. Please try again.")
 
@@ -1393,6 +1659,12 @@ class User:
 
 # ------------------------ #
 
+    def show_all_product(self):
+
+        Product.show_all_product()
+
+# ------------------------ #
+
     def edit_cart(self):
 
         self.cart.edit_cart()
@@ -1414,6 +1686,34 @@ class User:
     def show_orders(self):
 
         self.order.show_order_details()
+
+# ------------------------ #
+
+    def refund_order(self):
+        self.refund.refund_item()        
+
+# ------------------------ #
+
+    def show_refund(self):
+        self.refund.show_refund()
+
+# ------------------------ #
+
+    def search_product(self):
+
+        Product.search_product()
+
+# ------------------------ #
+
+    def panel(self):
+
+        print_color(f"wellcome Dear {self.username}.", "m")
+
+        while True:
+
+            print_color("1. all product.")
+
+            # just complete this
 
 # ------------------------ #
 
@@ -1600,6 +1900,8 @@ class Admin(User):
 
     def update_orders(self):
 
+        '''use for change an order from pending to delivered'''
+
         self.order.update_order()
 
 # ------------------------ #
@@ -1607,6 +1909,20 @@ class Admin(User):
     def search_order(self):
 
         self.order.search_order()
+
+# ------------------------ #
+
+    def add_new_product(self):
+
+        Product.add_new_product()
+
+# ------------------------ #
+
+    def update_product(self):
+        
+        '''use for update product quantity or product price'''
+
+        Product.update_product()
 
 # ------------------------ #
 
@@ -1682,4 +1998,24 @@ hadi = User("hadiahmadi")
 
 # Refund(mh.userid).refund_item()
 
-mh.search_order()
+# mh.search_order()
+
+# Refund(mh.userid).show_refund()
+
+# ali.refund_order()
+
+# mh.update_orders()
+
+# mh.add_new_product()
+
+# mh.add_new_category()
+
+# mh.show_all_product()
+
+# Product.update_product()
+
+# mh.update_product()
+
+# Product.search_product()
+
+# ali.search_product()
