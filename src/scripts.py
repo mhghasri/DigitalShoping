@@ -154,7 +154,7 @@ class Refund:
 
     def refund_item(self):
 
-        order_id_status = self.order.user_order_id()
+        order_id_status = self.order.user_order_id("delivered")
 
         if not order_id_status:
 
@@ -397,8 +397,13 @@ class Order:
 
 # ------------------------ #
 
-    def user_order_id(self):
-        query = "select ordersid, status from orders where userid = %s"
+    def user_order_id(self, mode: str="all"):
+
+        if mode == "all":
+            query = "select ordersid, status from orders where userid = %s"
+
+        elif mode == "delivered":
+            query = "select ordersid, status from orders where userid = %s AND Status = 'delivered'"
 
         params = (self.user_id, )
 
@@ -903,7 +908,6 @@ class ShipingCart:
 
         self.update_cart_items(product_id, quantity)
 
-
 # ------------------------ #
 
     def update_cart_items(self, product_id: int, delta: int):
@@ -950,7 +954,7 @@ class ShipingCart:
             query = "DELETE FROM CartItems WHERE CartID = %s AND ProductID = %s"
             params = (self.cart_id, product_id)
             ConnectToDB(query, *params).delete()  # متد delete لازم است
-            print_color("Product removed from cart because quantity became zero.", "c")
+            print_color("Product removed from cart because quantity became zero.")
             return
 
         # Update cart item quantity
@@ -1566,6 +1570,26 @@ class User:
 
 # ------------------------ #
 
+    def charge_balance(self):
+
+        self.current_balance()
+
+        while True:
+
+            try:
+                amount = int(input("\nEnter your amount to deposite: "))
+
+            except ValueError:
+                print_color("Please enter valid number.")
+
+            else:
+
+                break
+        
+        self.update_balance(amount, "charge")
+
+# ------------------------ #
+
     def buy_product(self):
 
         print_color("Here you are these are all product:", "c")
@@ -1711,9 +1735,76 @@ class User:
 
         while True:
 
-            print_color("1. all product.")
+            print_color("1. All product.\n\n2. Search product\n\n3. Buy product.\n\n4. View cart.\n\n5. Edit cart.\n\n6. Checkout cart.\n\n7. Show orders.\n\n8. Refund order.\n\n9. Refunded order.\n\n10. Charge balance.\n\n11. Current balance.\n\n12. log out.", "c")
 
-            # just complete this
+            try:
+                option = input("\nInput your option: ")
+
+                if int(option) in range(1, 13):
+
+                    if option == "1":
+                        
+                        self.show_all_product()
+
+                    elif option == "2":
+                        
+                        self.search_product()
+
+                    elif option == "3":
+                        
+                        self.buy_product()
+
+                    elif option == "4":
+                        
+                        self.view_cart()
+
+                    elif option == "5":
+                        
+                        self.edit_cart()
+
+                    elif option == "6":
+                        
+                        self.check_out_cart()
+
+                    elif option == "7":
+                        
+                        self.show_orders()
+
+                    elif option == "8":
+                        
+                        self.refund_order()
+
+                    elif option == "9":
+                        
+                        self.show_refund()
+
+                    elif option == "10":
+                        
+                        self.charge_balance()
+
+                    elif option == "11":
+
+                        self.current_balance()
+
+                    elif option == "12":
+                        
+                        print_color("logout successfully.", "g")
+
+                        break
+
+                else:
+
+                    print_color("Invalid number please enter valid number 1-12.")
+
+            except ValueError:
+
+                print_color("Invalid input please enter integer number.")
+
+            except KeyboardInterrupt:
+
+                print_color("\nExiting app ....", "g")
+
+                return
 
 # ------------------------ #
 
@@ -2019,3 +2110,9 @@ hadi = User("hadiahmadi")
 # Product.search_product()
 
 # ali.search_product()
+
+# ali.show_refund()
+
+ali.panel()
+
+# ali.charge_balance()
