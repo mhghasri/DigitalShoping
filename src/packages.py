@@ -1,10 +1,10 @@
-from dotenv import load_dotenv
+from dotenv import load_dotenv                  # for .env (DB information)
 from colorama import Fore
 import os
 from datetime import datetime
-import pymysql
-import arabic_reshaper
-from bidi.algorithm import get_display
+import pymysql                                  # for Database
+import arabic_reshaper                          # for persian print
+from bidi.algorithm import get_display          # for persian print
 from decimal import Decimal
 
 # ---------------------------- #
